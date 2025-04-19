@@ -1,28 +1,66 @@
+#include "encryption.h"
+#include <openssl/rand.h>
 #include <string.h>
 
-char caesar_encrypt(char ch, int key) {
-    if (ch >= 'a' && ch <= 'z') {
-        return 'a' + (ch - 'a' + key) % 26;
-    } else if (ch >= 'A' && ch <= 'Z') {
-        return 'A' + (ch - 'A' + key) % 26;
-    }
-    return ch;
+void init_encryption() {
+    OpenSSL_add_all_algorithms();
 }
 
-char caesar_decrypt(char ch, int key) {
-    return caesar_encrypt(ch, 26 - key);
+void generate_encryption_context(EncryptionContext *ctx) {
+    RAND_bytes(ctx->key, AES_KEY_SIZE/8);
+    RAND_bytes(ctx->iv, IV_SIZE);
 }
 
-void encrypt_message(const char *message, char *encrypted, int key) {
-    for (int i = 0; message[i] != '\0'; i++) {
-        encrypted[i] = caesar_encrypt(message[i], key);
+bool encrypt_message(const char *plaintext, char *ciphertext, size_t *ciphertext_len, const EncryptionContext *ctx) {
+    EVP_CIPHER_CTX *evp_ctx = EVP_CIPHER_CTX_new();
+    if (!evp_ctx) return false;
+    
+    if (EVP_EncryptInit_ex(evp_ctx, EVP_aes_256_gcm(), NULL, ctx->key, ctx->iv) != 1) {
+        EVP_CIPHER_CTX_free(evp_ctx);
+        return false;
     }
-    encrypted[strlen(message)] = '\0';
+    
+    int len;
+    if (EVP_EncryptUpdate(evp_ctx, (unsigned char*)ciphertext, &len, 
+                         (const unsigned char*)plaintext, strlen(plaintext)) != 1) {
+        EVP_CIPHER_CTX_free(evp_ctx);
+        return false;
+    }
+    
+    int final_len;
+    if (EVP_EncryptFinal_ex(evp_ctx, (unsigned char*)ciphertext + len, &final_len) != 1) {
+        EVP_CIPHER_CTX_free(evp_ctx);
+        return false;
+    }
+    
+    *ciphertext_len = len + final_len;
+    EVP_CIPHER_CTX_free(evp_ctx);
+    return true;
 }
 
-void decrypt_message(const char *encrypted, char *message, int key) {
-    for (int i = 0; encrypted[i] != '\0'; i++) {
-        message[i] = caesar_decrypt(encrypted[i], key);
+bool decrypt_message(const char *ciphertext, size_t ciphertext_len, char *plaintext, const EncryptionContext *ctx) {
+    EVP_CIPHER_CTX *evp_ctx = EVP_CIPHER_CTX_new();
+    if (!evp_ctx) return false;
+    
+    if (EVP_DecryptInit_ex(evp_ctx, EVP_aes_256_gcm(), NULL, ctx->key, ctx->iv) != 1) {
+        EVP_CIPHER_CTX_free(evp_ctx);
+        return false;
     }
-    message[strlen(encrypted)] = '\0';
+    
+    int len;
+    if (EVP_DecryptUpdate(evp_ctx, (unsigned char*)plaintext, &len,
+                         (const unsigned char*)ciphertext, ciphertext_len) != 1) {
+        EVP_CIPHER_CTX_free(evp_ctx);
+        return false;
+    }
+    
+    int final_len;
+    if (EVP_DecryptFinal_ex(evp_ctx, (unsigned char*)plaintext + len, &final_len) != 1) {
+        EVP_CIPHER_CTX_free(evp_ctx);
+        return false;
+    }
+    
+    plaintext[len + final_len] = '\0';
+    EVP_CIPHER_CTX_free(evp_ctx);
+    return true;
 }

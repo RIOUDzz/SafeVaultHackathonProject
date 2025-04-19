@@ -4,12 +4,19 @@
 #include "authentication.h"
 #include "encryption.h"
 #include "storage.h"
+#include "database.h"
 
 #define MAX_LEN 255
 #define ENCRYPTION_KEY 3
 
 int main() {
+    // Initialize the systems
     init_auth();
+    init_encryption();
+    if (!db_init()) {
+        printf("Failed to initialize database connection\n");
+        return 1;
+    }
     
     char username[MAX_LEN];
     char password[MAX_LEN];
@@ -23,7 +30,6 @@ int main() {
             return 1;
         }
         
-        // Try to convert input to number
         if (sscanf(input, "%d", &choice) != 1 || (choice != 1 && choice != 2 && choice != 3)) {
             printf("Invalid choice. Please enter 1, 2, or 3.\n");
             continue;
@@ -31,6 +37,7 @@ int main() {
 
         if (choice == 3) {
             printf("Goodbye!\n");
+            db_disconnect();
             return 0;
         }
 
@@ -40,19 +47,13 @@ int main() {
             return 1;
         }
         username[strcspn(username, "\n")] = '\0';
-        if (strlen(username) >= MAX_LEN - 1) {
-            printf("Username too long. Maximum length is %d characters.\n", MAX_LEN - 1);
-            continue;
-        }
-        printf("Debug: Username entered: '%s'\n", username);
-
+        
         printf("Enter password: ");
         if (fgets(password, sizeof(password), stdin) == NULL) {
             printf("Error reading password\n");
             return 1;
         }
         password[strcspn(password, "\n")] = '\0';
-        printf("Debug: Password entered: '%s'\n", password);
 
         bool success;
         if (choice == 1) {
@@ -90,13 +91,39 @@ int main() {
 
             switch (choice) {
                 case 1: {
-                    char message[MAX_LEN], encrypted[MAX_LEN];
-                    printf("\nWrite your secret message: ");
-                    fgets(message, sizeof(message), stdin);
+                    char message[MAX_LEN];
+                    char encrypted[MAX_LEN * 2];  // Allow space for encryption overhead
+                    char category[30];
+                    
+                    printf("\nEnter message category: ");
+                    if (fgets(category, sizeof(category), stdin) == NULL) {
+                        printf("Error reading category\n");
+                        break;
+                    }
+                    category[strcspn(category, "\n")] = '\0';
+                    
+                    printf("Write your secret message: ");
+                    if (fgets(message, sizeof(message), stdin) == NULL) {
+                        printf("Error reading message\n");
+                        break;
+                    }
                     message[strcspn(message, "\n")] = '\0';
 
-                    encrypt_message(message, encrypted, ENCRYPTION_KEY);
-                    save_encrypted_message(username, encrypted);
+                    // Create encryption context and encrypt message
+                    EncryptionContext ctx;
+                    generate_encryption_context(&ctx);
+                    size_t encrypted_len;
+                    
+                    if (!encrypt_message(message, encrypted, &encrypted_len, &ctx)) {
+                        printf("Failed to encrypt message\n");
+                        break;
+                    }
+
+                    if (!save_message(username, encrypted, category)) {
+                        printf("Failed to save message\n");
+                        break;
+                    }
+                    
                     printf("Message encrypted and saved successfully!\n");
                     break;
                 }
@@ -106,9 +133,10 @@ int main() {
                     break;
                 case 3:
                     printf("Logged out successfully!\n");
-                    goto main_menu;  // This returns to the main menu
+                    goto main_menu;
                 case 4:
                     printf("Goodbye!\n");
+                    db_disconnect();
                     return 0;
                 default:
                     printf("Invalid choice. Please try again.\n");
