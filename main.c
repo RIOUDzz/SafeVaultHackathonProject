@@ -12,7 +12,6 @@
 int main() {
     // Initialize the systems
     init_auth();
-    init_encryption();
     if (!db_init()) {
         printf("Failed to initialize database connection\n");
         return 1;
@@ -92,15 +91,6 @@ int main() {
             switch (choice) {
                 case 1: {
                     char message[MAX_LEN];
-                    char encrypted[MAX_LEN * 2];  // Allow space for encryption overhead
-                    char category[30];
-                    
-                    printf("\nEnter message category: ");
-                    if (fgets(category, sizeof(category), stdin) == NULL) {
-                        printf("Error reading category\n");
-                        break;
-                    }
-                    category[strcspn(category, "\n")] = '\0';
                     
                     printf("Write your secret message: ");
                     if (fgets(message, sizeof(message), stdin) == NULL) {
@@ -109,17 +99,7 @@ int main() {
                     }
                     message[strcspn(message, "\n")] = '\0';
 
-                    // Create encryption context and encrypt message
-                    EncryptionContext ctx;
-                    generate_encryption_context(&ctx);
-                    size_t encrypted_len;
-                    
-                    if (!encrypt_message(message, encrypted, &encrypted_len, &ctx)) {
-                        printf("Failed to encrypt message\n");
-                        break;
-                    }
-
-                    if (!save_message(username, encrypted, category)) {
+                    if (!save_message(username, message)) {
                         printf("Failed to save message\n");
                         break;
                     }

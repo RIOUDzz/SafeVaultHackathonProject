@@ -1,204 +1,229 @@
-# Secure Message Vault
+# SafeVault - Secure Message Storage
 
-A secure message storage system that allows users to register, login, and store encrypted messages.
+[English](#english) | [العربية](#arabic)
+
+# English
+
+A secure message storage system that allows users to register, login, and store encrypted messages using MySQL database and Caesar cipher encryption.
+
+# Arabic - العربية
+
+نظام تخزين رسائل آمن يسمح للمستخدمين بالتسجيل وتسجيل الدخول وتخزين الرسائل المشفرة باستخدام قاعدة بيانات MySQL وتشفير قيصر.
 
 ## Features
 
-- User registration and authentication
-- Secure password hashing
-- Message encryption using Caesar cipher
-- Persistent storage of user data and messages
+- Secure user registration and authentication
+- Password requirements (uppercase, lowercase, numbers, special characters)
+- Message encryption using Caesar cipher (shift by 3)
+- MySQL database storage for users and messages
 - Simple command-line interface
-- Logout functionality
-- Message viewing capability
-
-## Project Structure 
-├── main.c # Main program and user interface
-├── authentication.c # User registration and login logic
-├── authentication.h # Authentication function declarations
-├── encryption.c # Message encryption/decryption
-├── encryption.h # Encryption function declarations
-├── storage.c # File storage operations
-├── storage.h # Storage function declarations
-└── README.md # This documentation
+- Secure message viewing and storage
+- Session management with logout functionality
 
 
-## Data Files
+## المميزات
 
-- `users.dat`: Stores user credentials (username and hashed passwords)
-- `vault.txt`: Stores encrypted messages
+- تسجيل وتوثيق آمن للمستخدمين
+- متطلبات كلمة المرور (أحرف كبيرة، أحرف صغيرة، أرقام، رموز خاصة)
+- تشفير الرسائل باستخدام شفرة قيصر (إزاحة بمقدار 3)
+- تخزين في قاعدة بيانات MySQL للمستخدمين والرسائل
+- واجهة سطر أوامر بسيطة
+- عرض وتخزين آمن للرسائل
+- إدارة الجلسات مع إمكانية تسجيل الخروج
 
-## Security Features
+## Project Structure | هيكل المشروع
 
-### Password Hashing
-Passwords are hashed using a custom algorithm(djb2):
+```
+├── main.c              # Main program and user interface | البرنامج الرئيسي وواجهة المستخدم
+├── authentication.c    # User authentication logic | منطق المصادقة
+├── authentication.h    # Authentication headers | رؤوس المصادقة
+├── database.c         # Database operations | عمليات قاعدة البيانات
+├── database.h         # Database headers | رؤوس قاعدة البيانات
+├── db_config.h        # Database configuration | إعدادات قاعدة البيانات
+├── encryption.c       # Message encryption/decryption | تشفير/فك تشفير الرسائل
+├── encryption.h       # Encryption headers | رؤوس التشفير
+├── storage.c          # Message storage operations | عمليات تخزين الرسائل
+├── storage.h          # Storage headers | رؤوس التخزين
+└── README.md          # Documentation | التوثيق
+```
+
+
+## Database Structure | هيكل قاعدة البيانات
+
+### Users Table | جدول المستخدمين
+```sql
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    hashed_password BINARY(32) NOT NULL,
+    salt BINARY(16) NOT NULL,
+    failed_attempts INT DEFAULT 0,
+    last_attempt TIMESTAMP NULL,
+    is_locked BOOLEAN DEFAULT FALSE
+);
+```
+
+### Messages Table | جدول الرسائل
+```sql
+CREATE TABLE messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    encrypted_message TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
+
+## Security Features | ميزات الأمان
+
+### Password Security | أمان كلمة المرور
+- Passwords must contain uppercase, lowercase, numbers, and special characters
+- Passwords are hashed using a secure algorithm
+- Salt is added to prevent rainbow table attacks
+- Account lockout after multiple failed attempts
+
+### Message Encryption | تشفير الرسائل
 ```c
-int hash_password(const char *password) {
-    if (!password) return 0;
+char* caesar_encrypt(const char* text) {
+    if (!text) return NULL;
     
-    int hash = 5381;  // Initial value
-    for (int i = 0; password[i] != '\0'; i++) {
-        hash = ((hash << 5) + hash) + password[i];
+    int len = strlen(text);
+    char* result = (char*)malloc(len + 1);
+    
+    for (int i = 0; i < len; i++) {
+        if (isalpha(text[i])) {
+            char base = isupper(text[i]) ? 'A' : 'a';
+            result[i] = (text[i] - base + SHIFT_KEY) % 26 + base;
+        } else {
+            result[i] = text[i];
+        }
     }
-    return hash;
+    result[len] = '\0';
+    return result;
 }
 ```
-- Uses a multiplicative hash function
-- Initial value 5381 is a prime number
-- Shifts and adds for better distribution
-- Never stores plain text passwords
 
-### Message Encryption
-Messages are encrypted using a Caesar cipher:
-```c
-char caesar_encrypt(char ch, int key) {
-    if (ch >= 'a' && ch <= 'z') {
-        return 'a' + (ch - 'a' + key) % 26;
-    } else if (ch >= 'A' && ch <= 'Z') {
-        return 'A' + (ch - 'A' + key) % 26;
-    }
-    return ch;
-}
+## User Flow | تدفق المستخدم
+
+### Main Menu | القائمة الرئيسية
+1. Register new user | تسجيل مستخدم جديد
+2. Login existing user | تسجيل دخول مستخدم موجود
+3. Exit program | الخروج من البرنامج
+
+### Registration | التسجيل
+1. Enter username | إدخال اسم المستخدم
+2. Enter password (must meet requirements) | إدخال كلمة المرور (يجب أن تستوفي المتطلبات)
+3. System creates account in database | النظام ينشئ الحساب في قاعدة البيانات
+
+### Login | تسجيل الدخول
+1. Enter username | إدخال اسم المستخدم
+2. Enter password | إدخال كلمة المرور
+3. System verifies credentials | النظام يتحقق من البيانات
+
+### User Menu | قائمة المستخدم
+1. Write new message | كتابة رسالة جديدة
+2. View messages | عرض الرسائل
+3. Logout | تسجيل الخروج
+4. Exit | الخروج
+
+## Installation & Setup | التثبيت والإعداد
+
+### Requirements | المتطلبات
+- GCC compiler | مترجم GCC
+- MySQL server (XAMPP) | خادم MySQL (XAMPP)
+- MySQL development libraries | مكتبات تطوير MySQL
+
+### Database Setup | إعداد قاعدة البيانات
+1. Start XAMPP MySQL server | تشغيل خادم MySQL من XAMPP
+```bash
+sudo /opt/lampp/lampp startmysql
 ```
-- Shifts each letter by a fixed number (key)
-- Preserves case (uppercase/lowercase)
-- Only encrypts letters, leaves other characters unchanged
 
-## User Flow
-
-1. **Main Menu**
-   - Register new user
-   - Login existing user
-   - Exit program
-
-2. **Registration**
-   - Enter username
-   - Enter password
-   - System hashes password and stores credentials
-
-3. **Login**
-   - Enter username
-   - Enter password
-   - System verifies credentials
-
-4. **Logged-in Menu**
-   - Write new message
-   - View existing messages
-   - Logout
-   - Exit program
-
-## Data Structures
-
-### User Structure
-```c
-typedef struct {
-    char username[USERNAME_LENGTH];
-    int hashed_password;
-} User;
+2. Create database | إنشاء قاعدة البيانات
+```bash
+/opt/lampp/bin/mysql -u root -e "CREATE DATABASE IF NOT EXISTS safevault;"
 ```
-- Stores username and hashed password
-- Fixed size arrays for security
 
-## File Operations
+### Compilation | التجميع
+```bash
+gcc -o safevault main.c database.c authentication.c encryption.c storage.c -lmysqlclient -lcrypto
+```
 
-### User Storage
-- Users are stored in binary format
-- File operations include:
-  - Loading users at startup
-  - Saving new users
-  - Error handling for file operations
+### Running | التشغيل
+```bash
+./safevault
+```
 
-### Message Storage
-- Messages are stored in text format
-- Each message is associated with a username
-- Messages are encrypted before storage
+## Error Handling | معالجة الأخطاء
 
-## Error Handling
+### Input Validation | التحقق من المدخلات
+- Username validation | التحقق من اسم المستخدم
+- Password complexity requirements | متطلبات تعقيد كلمة المرور
+- Buffer overflow protection | الحماية من تجاوز المخزن المؤقت
+- SQL injection prevention | منع حقن SQL
 
-- Input validation for all user inputs
-- File operation error checking
-- Buffer overflow protection
-- Memory initialization checks
-- Username length validation
-- Password length validation
-- Menu choice validation
+### Database Operations | عمليات قاعدة البيانات
+- Connection error handling | معالجة أخطاء الاتصال
+- Query error handling | معالجة أخطاء الاستعلام
+- Transaction management | إدارة المعاملات
 
-## Security Considerations
+### Memory Management | إدارة الذاكرة
+- Proper memory allocation | تخصيص الذاكرة المناسب
+- Memory deallocation | تحرير الذاكرة
+- NULL pointer checks | فحص المؤشرات الفارغة
 
-1. **Password Security**
-   - Passwords are never stored in plain text
-   - Uses hashing to protect passwords
-   - Basic protection against password guessing
+## Security Features | ميزات الأمان
 
-2. **Message Security**
-   - Messages are encrypted before storage
-   - Simple Caesar cipher (for educational purposes)
-   - Messages are associated with specific users
+### Authentication | المصادقة
+- Secure password storage | تخزين آمن لكلمات المرور
+- Account lockout | قفل الحساب
+- Session management | إدارة الجلسات
 
-3. **Input Validation**
-   - Checks for buffer overflows
-   - Validates all user inputs
-   - Sanitizes file operations
-   - Validates username and password lengths
+### Data Protection | حماية البيانات
+- Message encryption | تشفير الرسائل
+- User data isolation | عزل بيانات المستخدم
+- Secure database connections | اتصالات آمنة بقاعدة البيانات
 
-## Constants and Configuration
+## Current Limitations | القيود الحالية
 
-#define MAX_LEN 255              // Maximum length for strings
-#define USERNAME_LENGTH 50       // Maximum username length
-#define PASSWORD_LENGTH 50       // Maximum password length
-#define ENCRYPTION_KEY 3         // Caesar cipher shift value
-#define MAX_USERS 100           // Maximum number of users
+### Security | الأمان
+- Caesar cipher is not cryptographically secure | شفرة قيصر ليست آمنة تشفيرياً
+- No end-to-end encryption | لا يوجد تشفير من طرف إلى طرف
+- Basic session management | إدارة جلسات أساسية
 
-## Debug Features
+### Features | المميزات
+- No message editing | لا يمكن تعديل الرسائل
+- No message deletion | لا يمكن حذف الرسائل
+- No password recovery | لا توجد استعادة كلمة المرور
+- Text-based interface only | واجهة نصية فقط
 
-- Debug messages for user input
-- Debug messages for authentication
-- Debug messages for file operations
-- User count tracking
-- Login attempt tracking
+## Future Improvements | التحسينات المستقبلية
 
-## Limitations
+### Security | الأمان
+- Implement AES encryption | تنفيذ تشفير AES
+- Add two-factor authentication | إضافة المصادقة الثنائية
+- Implement secure key exchange | تنفيذ تبادل المفاتيح الآمن
 
-1. **Security**
-   - Basic password hashing (not suitable for production)
-   - Simple encryption (Caesar cipher is not secure)
-   - No protection against brute force attacks
-   - No password complexity requirements
-   - No account lockout after failed attempts
+### Features | المميزات
+- GUI using GTK/Qt | واجهة رسومية باستخدام GTK/Qt
+- Message editing and deletion | تعديل وحذف الرسائل
+- Password recovery system | نظام استعادة كلمة المرور
+- Binary file encryption | تشفير الملفات الثنائية
 
-2. **Features**
-   - No password recovery
-   - No message deletion
-   - No user account management
-   - No message editing
-   - No message search
-   - No message sorting
+## Contributing | المساهمة
 
-## Future Improvements
+This project was created for educational purposes. Contributions are welcome!
+تم إنشاء هذا المشروع لأغراض تعليمية. المساهمات مرحب بها!
 
-1. **Security**
-   - Implement stronger password hashing (bcrypt/Argon2)
-   - Add salt to password hashing
-   - Implement stronger encryption (AES)
-   - Add password complexity requirements
-   - Implement account lockout
-   - Add session management
+## License | الترخيص
 
-2. **Features**
-   - Add password recovery
-   - Add message deletion
-   - Add user account management
-   - Add message search functionality
-   - Add message editing
-   - Add message sorting
-   - Add message categories
-   - Add message timestamps
+MIT License
+رخصة MIT
+   ```
 
-## Usage
-
-1. Compile the program:
+2. تشغيل البرنامج:
    ```bash
-   gcc *.c -o safevault
+   ./safevault
    ```
 
 2. Run the program:
@@ -206,28 +231,57 @@ typedef struct {
    ./safevault
    ```
 
+3. اتبع التعليمات على الشاشة للقيام بما يلي:
+   - تسجيل حساب جديد
+   - تسجيل الدخول إلى حسابك
+   - كتابة وعرض الرسائل
+   - تسجيل الخروج عند الانتهاء
+
 3. Follow the on-screen instructions to:
    - Register a new account
    - Login to your account
    - Write and view messages
    - Logout when finished
 
-## Troubleshooting
+## حل المشاكل
+
+1. **مشاكل تسجيل الدخول**
+   - تحقق من اسم المستخدم وكلمة المرور
+   - تأكد من تسجيل المستخدم
+   - تأكد من استخدام الحروف الصحيحة (الحالة العلوية والسفلية)
 
 1. **Login Issues**
    - Verify username and password
    - Check if user is registered
    - Ensure correct case for username
 
+2. **مشاكل الرسائل**
+   - تحقق من طول الرسالة
+   - تحقق من مفتاح التشفير
+   - تحقق من صلاحيات الملف
+
 2. **Message Issues**
    - Check message length
    - Verify encryption key
    - Check file permissions
 
+3. **مشاكل الملفات**
+   - تحقق من صلاحيات الملف
+   - تأكد من وجود الملف
+   - تحقق من مساحة القرص
+
 3. **File Issues**
    - Check file permissions
    - Verify file existence
    - Check disk space
+
+## المساهمة
+
+1. قم بنسخ المستودع
+2. قم بإنشاء فرع جديد
+3. قم بإضافة التغييرات
+4. قم بنشر التغييرات إلى الفرع
+5. قم بإنشاء طلب سحب
 
 ## Contributing
 
@@ -237,6 +291,10 @@ typedef struct {
 4. Push to the branch
 5. Create a Pull Request
 
+## الترخيص
+
+هذا المشروع مرخص بموجب ترخيص MIT - راجع ملف الترخيص للتفاصيل
+
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details

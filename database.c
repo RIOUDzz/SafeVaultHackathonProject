@@ -14,7 +14,7 @@ bool db_connect() {
     }
 
     if (mysql_real_connect(conn, DB_HOST, DB_USER, DB_PASS, 
-                          DB_NAME, DB_PORT, NULL, 0) == NULL) {
+                          DB_NAME, DB_PORT, DB_SOCKET, 0) == NULL) {
         fprintf(stderr, "Error: Failed to connect to database\n");
         fprintf(stderr, "Error message: %s\n", mysql_error(conn));
         mysql_close(conn);
@@ -59,7 +59,6 @@ bool db_init() {
         "id INT AUTO_INCREMENT PRIMARY KEY,"
         "user_id INT NOT NULL,"
         "encrypted_message TEXT NOT NULL,"
-        "category VARCHAR(30),"
         "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
         "FOREIGN KEY (user_id) REFERENCES users(id)"
         ")";
